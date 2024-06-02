@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PhotoFlow{% endblock %}</title>
+    <link rel="icon" href="{% static "images/logo_icon.png" %}" type="image/x-icon">
+    {% load bootstrap5 %} {% bootstrap_css %} {% bootstrap_javascript %}
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="{% static "css/styles.css" %}">
+    <style>
+        .navbar-brand img {
+            height: 30px;
+        }
+        .navbar-nav .nav-link {
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        .form-inline {
+            display: flex;
+            align-items: center;
+        }
+        .form-inline input {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    
+    {% include "includes/header.html" %}
+
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <img src="{{ post.image.url }}" class="img-fluid" alt="Post image" style="width: 100%; height: auto;">
+        </div>
+        <div class="col-md-4">
+            <div class="p-3">
+                <div class="d-flex align-items-center mb-3">
+                    <img src="{{ post.user.profile_picture.url }}" class="rounded-circle img-fluid mr-3" alt="Profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+                    <strong class="mr-3 mb-0 ms-2">{{ post.user.username }}</strong>
+                    {% if user != post.user %}
+                        <a href="#" class="btn-sm ml-auto ms-2 sub-link">Подписаться</a>
+                    {% endif %}
+                </div>
+                <hr>
+                <div class="comments-section">
+                    <div class="comment mb-3">
+                        <img src="{{ post.user.profile_picture.url }}" class="rounded-circle img-fluid mr-3" alt="Commenter profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+
+                        <strong class="ms-1">{{ post.user.username }}</strong> {{ post.caption }}
+                    </div>
+                    {% for comment in post.comments.all %}
+                        <div class="comment mb-3 d-flex align-items-start">
+                            <img src="{{ comment.user.profile_picture.url }}" class="rounded-circle img-fluid mr-3" alt="Commenter profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+                            <div class="ms-2">
+                                <strong>{{ comment.user.username }}</strong> {{ comment.text }}
+                                <div class="text-muted small">{{ comment.created_at|timesince }} назад</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="d-flex align-items-center mb-3">
+                    <img src="{% static 'images/heart_static.png' %}" alt="Like" class="like-icon" data-post-id="{{ post.id }}" data-liked="{{ post.is_liked }}" style="width: 30px; cursor: pointer;">
+                    <img src="{% static 'images/comment_icon.png' %}" alt="Comment" class="me-2 comment-icon ms-2" data-post-id="{{ post.id }}" style="width: 30px; cursor: pointer;">
+                    <img src="{% static 'images/message_icon.png' %}" alt="Message" class="message-icon" data-post-url="{% url 'post_detail' post.pk %}" style="width: 30px; cursor: pointer;">
+                </div>
+                <span class="ml-2 likes-count">{{ post.likes_count }} отметок "Нравится"</span>
+                <div class="text-muted mb-3">{{ post.created_at|date:"d M Y" }}</div>
+                <div class="comment-form mt-2">
+                    <textarea class="form-control mb-2 rounded" rows="1" placeholder="Напишите комментарий..."></textarea>
+                    <button class="btn btn-primary btn-sm submit-comment rounded" data-post-id="{{ post.id }}">Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для выбора чата -->
+<div class="modal fade" id="chatModal" tabindex="-1" aria-labelledby="chatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="chatModalLabel">Выберите чат</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h4>Чаты</h4>
+                        <ul class="list-group" id="chat-users-list">
+                            <!-- Список пользователей для чатов будет загружен динамически -->
+                        </ul>
+                    </div>
+                    <div class="col-md-8">
+                        <h4 id="chat-with-user">Отправить сообщение</h4>
+                        <button id="send-message-button" class="btn btn-primary" style="display: none;">Отправить сообщение</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container-fluid {
+        padding: 0;
+    }
+    .comments-section {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .comment {
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+    }
+    .like-icon.playing {
+        animation: like-animation 0.5s;
+    }
+    @keyframes like-animation {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const likeIcon = document.querySelector('.like-icon');
+        const submitCommentButton = document.querySelector('.submit-comment');
+        const commentIcons = document.querySelectorAll('.comment-icon');
+        const messageIcons = document.querySelectorAll('.message-icon');
+
+        likeIcon.addEventListener('click', function() {
+            const isLiked = this.getAttribute('data-liked') === 'true';
+            const postId = this.getAttribute('data-post-id');
+
+            fetch(`/api/post/${postId}/like/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ user: '{{ user.id }}', post: postId })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (isLiked) {
+                    this.setAttribute('data-liked', 'false');
+                    this.src = '{% static 'images/heart_static.png' %}';
+                } else {
+                    this.setAttribute('data-liked', 'true');
+                    this.src = '{% static 'images/heart_static_end.png' %}';
+                    this.classList.add('playing');
+                    setTimeout(() => {
+                        this.classList.remove('playing');
+                    }, 500);
+                }
+                document.querySelector('.likes-count').textContent = data.likes_count + ' отметок "Нравится"';
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+            });
+        });
+
+        submitCommentButton.addEventListener('click', function() {
+            const postId = this.getAttribute('data-post-id');
+            const commentForm = document.querySelector('.comment-form');
+            const textarea = commentForm.querySelector('textarea');
+            const commentText = textarea.value;
+
+            if (commentText.trim() === '') {
+                alert('Комментарий не может быть пустым');
+                return;
+            }
+
+            fetch(`/api/post/${postId}/comment/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ user: '{{ user.id }}', post: postId, text: commentText })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.id) {
+                    // Обновление интерфейса после успешного добавления комментария
+                    textarea.value = '';
+                    const commentsSection = document.querySelector('.comments-section');
+                    commentsSection.innerHTML += `
+                        <div class="comment mb-3 d-flex align-items-start">
+                            <img src="{{ user.profile_picture.url }}" class="rounded-circle img-fluid mr-3" alt="Commenter profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+                            <div class="ms-2">
+                                <strong>{{ user.username }}</strong> ${data.text}
+                                <div class="text-muted small">только что</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+            });
+        });
+
+        commentIcons.forEach(icon => {
+            icon.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                const commentForm = document.querySelector('.comment-form');
+                commentForm.style.display = commentForm.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+
+        messageIcons.forEach(icon => {
+            icon.addEventListener('click', function() {
+                const postUrl = this.getAttribute('data-post-url');
+                fetch('/api/chat_users/')
+                .then(response => response.json())
+                .then(data => {
+                    const chatUsersList = document.getElementById('chat-users-list');
+                    chatUsersList.innerHTML = '';
+                    data.chat_users.forEach(user => {
+                        const userItem = document.createElement('li');
+                        userItem.classList.add('list-group-item');
+                        userItem.innerHTML = `
+                            <a href="#" class="chat-user" data-user-id="${user.id}" data-post-url="${postUrl}">
+                                <img src="${user.profile_picture}" class="rounded-circle me-2" alt="Profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+                                ${user.username}
+                            </a>
+                        `;
+                        chatUsersList.appendChild(userItem);
+                    });
+
+                    const chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
+                    chatModal.show();
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                });
+            });
+        });
+
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('chat-user')) {
+                event.preventDefault();
+                const userId = event.target.getAttribute('data-user-id');
+                const postUrl = event.target.getAttribute('data-post-url');
+                const sendMessageButton = document.getElementById('send-message-button');
+                sendMessageButton.setAttribute('data-user-id', userId);
+                sendMessageButton.setAttribute('data-post-url', postUrl);
+                sendMessageButton.style.display = 'block';
+            }
+        });
+
+        document.getElementById('send-message-button').addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const postUrl = this.getAttribute('data-post-url');
+            const baseUrl = window.location.origin;
+            const fullPostUrl = `${baseUrl}${postUrl}`;
+            const messageText = `Посмотрите эту публикацию: ${fullPostUrl}`;
+
+            fetch('/api/send_message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    receiver: userId,
+                    text: messageText
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'message sent') {
+                    alert('Сообщение отправлено');
+                    const chatModal = bootstrap.Modal.getInstance(document.getElementById('chatModal'));
+                    chatModal.hide();
+                }
+            })
+            .catch(error => console.error('Ошибка:', error));
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    });
+</script>
+{% endblock %}
