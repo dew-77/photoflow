@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            {% for post in posts %}
+                <div class="card mb-5">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <a href="{% url 'profile' post.user.username %}" class="text-dark text-decoration-none d-flex align-items-center">
+                                <img src="{{ post.user.profile_picture.url }}" class="rounded-circle me-2" alt="Profile picture" style="width: 40px; height: 40px; object-fit: cover;">
+                                <strong>{{ post.user.username }}</strong>
+                                <strong class="ms-2"> • </strong>
+                                <small class="text-muted ms-2">{{ post.days_since_creation }} дн.</small>
+                            </a>
+                            {% if user.is_authenticated and user != post.user and not post.is_followed %}
+                                <strong class="ms-2"> • </strong>
+                                <a href="#" class="ms-2 subscribe-link" data-user-id="{{ post.user.id }}" style="text-decoration: none;"><b>Подписаться</b></a>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">•••</small>
+                    </div>
+                    <div class="card-body p-0">
+                        <a href="{% url 'post_detail' post.pk %}">
+                            <img src="{{ post.image.url }}" class="img-fluid w-100" alt="Post image" style="object-fit: cover; max-height: 500px;">
+                        </a>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <div class="d-flex">
+                                <img src="{% if post.is_liked %}{% static 'images/heart_static_end.png' %}{% else %}{% static 'images/heart_static.png' %}{% endif %}" alt="Like" class="like-icon me-2" data-post-id="{{ post.id }}" data-liked="{{ post.is_liked }}" style="width: 30px; cursor: pointer;">
+                                <img src="{% static 'images/comment_icon.png' %}" alt="Comment" class="me-2 comment-icon" data-post-id="{{ post.id }}" style="width: 30px; cursor: pointer;">
+                                <img src="{% static 'images/message_icon.png' %}" alt="Message" style="width: 30px; cursor: pointer;">
+                            </div>
+                            <img src="{% static 'images/bookmark_icon.png' %}" alt="Bookmark" style="width: 30px; cursor: pointer;">
+                        </div>
+                        <p class="mt-2 mb-1"><strong><span class="likes-count">{{ post.likes_count }}</span> отметок "Нравится"</strong></p>
+                        <p class="mb-1"><strong>{{ post.user.username }}</strong> {{ post.caption }}</p>
+                        <p class="text-muted mb-1"><a href="{% url 'post_detail' post.pk %}" class="text-muted text-decoration-none">Посмотреть все комментарии (<span class="comments-count">{{ post.comments_count }}</span>)</a></p>
+                        <p class="text-muted mb-0 add-comment" data-post-id="{{ post.id }}" style="cursor: pointer;">Добавить комментарий</p>
+                        <div class="comment-form mt-2" id="comment-form-{{ post.id }}" style="display: none;">
+                            <textarea class="form-control mb-2 rounded" rows="1" placeholder="Напишите комментарий..."></textarea>
+                            <button class="btn btn-primary btn-sm submit-comment rounded" data-post-id="{{ post.id }}">Отправить</button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .subscribe-link {
+        font-size: 0.875rem; /* Уменьшение размера шрифта */
+        letter-spacing: -0.5px; /* Сжатие расстояния между буквами */
+        color: #0095F6; /* Цвет текста */
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const likeIcons = document.querySelectorAll('.like-icon');
+        const commentIcons = document.querySelectorAll('.comment-icon');
+        const addCommentLinks = document.querySelectorAll('.add-comment');
+        const subscribeLinks = document.querySelectorAll('.subscribe-link');
+
+        likeIcons.forEach(icon => {
+            const isLiked = icon.getAttribute('data-liked') === 'true';
+            if (isLiked) {
+                icon.src = '{% static "images/heart_static_end.png" %}';
+                icon.setAttribute('data-liked', 'true');
+            }
+
+            icon.addEventListener('click', function() {
+                const isLiked = this.getAttribute('data-liked') === 'true';
+                const postId = this.getAttribute('data-post-id');
+                const likesCountElement = this.closest('.card-footer').querySelector('.likes-count');
+                let likesCount = parseInt(likesCountElement.textContent);
+
+                fetch(`/api/post/${postId}/like/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ user: '{{ user.id }}', post: postId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (isLiked) {
+                        // Уменьшение количества лайков и замена изображения на статичное
+                        likesCountElement.textContent = likesCount - 1;
+                        this.src = '{% static "images/heart_static.png" %}';
+                        this.setAttribute('data-liked', 'false');
+                    } else {
+                        // Увеличение количества лайков и замена изображения на анимацию
+                        likesCountElement.textContent = likesCount + 1;
+                        this.src = '{% static "images/heart.gif" %}';
+                        this.classList.add('playing');
+
+                        // Замена анимации обратно на статичное изображение после завершения
+                        setTimeout(() => {
+                            this.src = '{% static "images/heart_static_end.png" %}';
+                            this.setAttribute('data-liked', 'true');
+                        }, 500); // 500ms для завершения анимации
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                });
+            });
+        });
+
+        commentIcons.forEach(icon => {
+            icon.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                const commentForm = document.getElementById(`comment-form-${postId}`);
+                commentForm.style.display = commentForm.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+
+        addCommentLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                const commentForm = document.getElementById(`comment-form-${postId}`);
+                commentForm.style.display = commentForm.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+
+        subscribeLinks.forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                const userId = this.getAttribute('data-user-id');
+
+                fetch(`/api/follow/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ follower: '{{ user.id }}', following: userId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.textContent = '';
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                });
+            });
+        });
+
+        document.querySelectorAll('.submit-comment').forEach(button => {
+            button.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                const commentForm = document.getElementById(`comment-form-${postId}`);
+                const textarea = commentForm.querySelector('textarea');
+                const commentText = textarea.value;
+
+                if (commentText.trim() === '') {
+                    alert('Комментарий не может быть пустым');
+                    return;
+                }
+
+                fetch(`/api/post/${postId}/comment/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ user: '{{ user.id }}', post: postId, text: commentText })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.id) {
+                        // Обновление интерфейса после успешного добавления комментария
+                        textarea.value = '';
+                        const commentsCountElement = commentForm.closest('.card-footer').querySelector('.comments-count');
+                        let commentsCount = parseInt(commentsCountElement.textContent);
+                        commentsCountElement.textContent = commentsCount + 1;
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                });
+            });
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+    });
+</script>
+{% endblock %}
