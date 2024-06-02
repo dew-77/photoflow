@@ -27,4 +27,19 @@ urlpatterns = [
         api_views.RemoveFollowAPIView.as_view(),
         name='remove_follow'
     ),
+    path(
+        'send_message/',
+        api_views.SendMessageAPIView.as_view(),
+        name='send_message'
+    ),
+    path(
+        'chat_users/',
+        api_views.ChatUsersAPIView.as_view(),
+        name='chat_users'
+    ),
+    path(
+        'chat/<int:user_id>/',
+        api_views.ChatMessagesAPIView.as_view(),
+        name='chat_messages'
+    ),
 ]

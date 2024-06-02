@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4">
+            <h4>Чаты</h4>
+            <ul class="list-group">
+                {% for chat_user in chat_users %}
+                    <li class="list-group-item">
+                        <a href="?user={{ chat_user.id }}" class="text-dark text-decoration-none">
+                            <img src="{{ chat_user.profile_picture.url }}" class="rounded-circle me-2" alt="Profile picture" style="width: 30px; height: 30px; object-fit: cover;">
+                            {{ chat_user.username }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-md-8">
+            {% if selected_user %}
+                <h4 class="mt-3">Переписка с {{ selected_user.username }}</h4>
+                <div class="chat-box" id="chat-box" style="max-height: 400px; overflow-y: auto;">
+                    {% for message in messages %}
+                        <div class="message {% if message.sender == user %}sent me-2{% else %}received{% endif %}">
+                            <div class="message-content">
+                                <strong>{{ message.sender.username }}</strong>: {{ message.text }}
+                                <div class="text-muted small">{{ message.created_at|timesince }} назад</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <hr>
+                <form id="message-form" class="d-flex">
+                    <input type="text" id="message-text" class="form-control me-2" placeholder="Введите сообщение...">
+                    <button type="submit" class="btn btn-primary">Отправить</button>
+                </form>
+            {% else %}
+                <p>Выберите чат для начала переписки.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .message {
+        margin-bottom: 10px;
+    }
+    .message.sent .message-content {
+        text-align: right;
+    }
+    .message.received .message-content {
+        text-align: left;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatBox = document.getElementById('chat-box');
+        const messageForm = document.getElementById('message-form');
+        const messageText = document.getElementById('message-text');
+
+        messageForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const text = messageText.value.trim();
+            if (text === '') return;
+
+            const receiverId = '{{ selected_user.id }}';
+
+            fetch('/api/send_message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    receiver: receiverId,
+                    text: text
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'message sent') {
+                    const newMessage = document.createElement('div');
+                    newMessage.classList.add('message', 'sent');
+                    newMessage.innerHTML = `
+                        <div class="message-content">
+                            <strong>{{ user.username }}</strong>: ${text}
+                            <div class="text-muted small">только что</div>
+                        </div>
+                    `;
+                    chatBox.appendChild(newMessage);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    messageText.value = '';
+                }
+            })
+            .catch(error => console.error('Ошибка:', error));
+        });
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '='))
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                }
+            }
+            return cookieValue;
+        }
+    });
+</script>
+{% endblock %}

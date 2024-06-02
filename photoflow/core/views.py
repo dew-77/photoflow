@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django.views import generic
-from .models import Post, Follow, Like, Comment
+from .models import Post, Follow, Like, Comment, Message, User
 from .forms import PostForm, CommentForm
 from django.utils import timezone
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -126,5 +126,33 @@ class NotificationsView(LoginRequiredMixin, generic.TemplateView):
         )
 
         context['notifications'] = notifications
+
+        return context
+
+
+class MessagesView(LoginRequiredMixin, generic.TemplateView):
+    template_name = 'core/messages.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        # Получаем всех пользователей, с которыми текущий пользователь переписывался
+        sent_messages = Message.objects.filter(sender=user).values_list('receiver', flat=True)
+        received_messages = Message.objects.filter(receiver=user).values_list('sender', flat=True)
+        chat_users_ids = set(sent_messages).union(set(received_messages))
+        chat_users = User.objects.filter(id__in=chat_users_ids)
+
+        context['chat_users'] = chat_users
+
+        # Если выбран чат, получаем сообщения для этого чата
+        selected_user_id = self.request.GET.get('user')
+        if selected_user_id:
+            selected_user = User.objects.get(id=selected_user_id)
+            context['selected_user'] = selected_user
+            context['messages'] = Message.objects.filter(
+                (Q(sender=user) & Q(receiver=selected_user)) |
+                (Q(sender=selected_user) & Q(receiver=user))
+            ).order_by('created_at')
 
         return context

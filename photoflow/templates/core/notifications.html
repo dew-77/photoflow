@@ -10,9 +10,9 @@
                 {% for notification in notifications %}
                     <li class="list-group-item">
                         {% if notification.type == "like" %}
-                            <a href="{% url 'profile' notification.user.username %}" class="text-dark text-decoration-none">
+                            <a href="{% url 'profile' notification.user.username %}" class="text-dark text-decoration-none"><strong>
                                 <img src="{{ notification.user.profile_picture.url }}" class="rounded-circle me-2" alt="Profile picture" style="width: 30px; height: 30px; object-fit: cover;">
-                                {{ notification.user.username }}
+                                {{ notification.user.username }}</strong>
                             </a> понравился ваш пост
                             <a href="{% url 'post_detail' notification.post.pk %}">{{ notification.post.caption }}</a>
                             <span class="text-muted small">{{ notification.created_at|timesince }} назад</span>

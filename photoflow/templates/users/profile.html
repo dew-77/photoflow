@@ -12,11 +12,11 @@
                 {% if user != user_profile %}
                     <div class="btn-group ml-3">
                         {% if not is_following %}
-                            <a href="#" class="btn btn-primary btn-sm subscribe-link" data-user-id="{{ user_profile.id }}" style="background-color: #0095f6; border-color: #0095f6; margin-right: 8px;">Подписаться</a>
+                            <a href="#" class="btn btn-sm subscribe-link ms-3 rounded" data-user-id="{{ user_profile.id }}" style="margin-right: 8px; text-decoration:none; background-color:#0095F6; color:white;">Подписаться</a>
                         {% else %}
-                            <a href="#" class="btn btn-outline-secondary btn-sm unsubscribe-link" data-user-id="{{ user_profile.id }}" style="margin-right: 8px;">Отписаться</a>
+                            <a href="#" class="ms-3 btn btn-sm unsubscribe-link rounded" data-user-id="{{ user_profile.id }}" style="margin-right: 8px; background-color:#0095F6; color:white;">Отписаться</a>
                         {% endif %}
-                        <a href="#" class="btn btn-outline-primary btn-sm">Отправить сообщение</a>
+                        <button type="button" class="btn btn-primary btn-sm rounded send-message-btn" data-user-id="{{ user_profile.id }}" data-bs-toggle="modal" data-bs-target="#messageModal">Отправить сообщение</button>
                     </div>
                 {% endif %}
             </div>
@@ -45,6 +45,27 @@
                 </a>
             </div>
         {% endfor %}
+    </div>
+</div>
+
+<!-- Модальное окно для отправки сообщения -->
+<div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageModalLabel">Отправить сообщение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="message-form">
+                    <div class="mb-3">
+                        <label for="message-text" class="form-label">Сообщение</label>
+                        <textarea class="form-control" id="message-text" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Отправить</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -83,12 +104,23 @@
     .post-container:hover .overlay {
         opacity: 1;
     }
+    .btn-primary,
+    .btn-primary.active,
+    .btn-primary:active,
+    .btn-primary:focus,
+    .btn-primary:hover {
+        border-color: #ff6ec4;
+        color: white;
+    }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const subscribeLinks = document.querySelectorAll('.subscribe-link');
         const unsubscribeLinks = document.querySelectorAll('.unsubscribe-link');
+        const sendMessageBtns = document.querySelectorAll('.send-message-btn');
+        const messageForm = document.getElementById('message-form');
+        const messageText = document.getElementById('message-text');
 
         subscribeLinks.forEach(link => {
             link.addEventListener('click', function(event) {
@@ -112,9 +144,6 @@
                 .then(data => {
                     this.textContent = 'Отписаться';
                     this.classList.remove('btn-primary');
-                    this.classList.add('btn-outline-secondary');
-                    this.classList.remove('subscribe-link');
-                    this.classList.add('unsubscribe-link');
                     this.removeEventListener('click', subscribeHandler);
                     this.addEventListener('click', unsubscribeHandler);
                 })
@@ -144,10 +173,6 @@
                 })
                 .then(data => {
                     this.textContent = 'Подписаться';
-                    this.classList.remove('btn-outline-secondary');
-                    this.classList.add('btn-primary');
-                    this.classList.remove('unsubscribe-link');
-                    this.classList.add('subscribe-link');
                     this.removeEventListener('click', unsubscribeHandler);
                     this.addEventListener('click', subscribeHandler);
                 })
@@ -208,10 +233,6 @@
             })
             .then(data => {
                 this.textContent = 'Подписаться';
-                this.classList.remove('btn-outline-secondary');
-                this.classList.add('btn-primary');
-                this.classList.remove('unsubscribe-link');
-                this.classList.add('subscribe-link');
                 this.removeEventListener('click', unsubscribeHandler);
                 this.addEventListener('click', subscribeHandler);
             })
@@ -219,6 +240,52 @@
                 console.error('Ошибка:', error);
             });
         }
+
+        sendMessageBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const userId = this.getAttribute('data-user-id');
+                messageForm.setAttribute('data-user-id', userId);
+            });
+        });
+
+        messageForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const userId = this.getAttribute('data-user-id');
+            const text = messageText.value.trim();
+
+            if (text === '') {
+                alert('Сообщение не может быть пустым');
+                return;
+            }
+
+            fetch('/api/send_message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    receiver: userId,
+                    text: text
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Ошибка:', response.statusText);
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'message sent') {
+                    alert('Сообщение отправлено');
+                    messageText.value = '';
+                    const messageModal = bootstrap.Modal.getInstance(document.getElementById('messageModal'));
+                    messageModal.hide();
+                }
+            })
+            .catch(error => console.error('Ошибка:', error));
+        });
 
         function getCookie(name) {
             let cookieValue = null;

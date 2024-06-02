@@ -27,7 +27,6 @@
 
 .subscribe-link,
 .subscribe-link:hover{
-    font-size: 1rem; /* Уменьшение размера шрифта */
     letter-spacing: -0.6px; /* Сжатие расстояния между буквами */
     color: #0095F6; /* Цвет текста */
 }
